@@ -29,6 +29,7 @@
       case "google.protobuf.StringValue":
       case "google.protobuf.BytesValue":
       case "google.protobuf.Struct":
+      case "google.protobuf.FieldMask":
         return true;
 
       default:

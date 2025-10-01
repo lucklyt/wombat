@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -30,6 +31,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
 const (
@@ -297,7 +299,7 @@ func (a *api) GetRawMessageState(method string) (string, error) {
 	return string(val), err
 }
 
-//FindProtoFiles opens a directory dialog to search for proto files
+// FindProtoFiles opens a directory dialog to search for proto files
 func (a *api) FindProtoFiles() (files []string, rerr error) {
 	defer func() {
 		if rerr != nil {
@@ -324,7 +326,7 @@ func (a *api) FindProtoFiles() (files []string, rerr error) {
 	return files, nil
 }
 
-//SelectDirectory opens a directory dialog and returns the path of the selected directory
+// SelectDirectory opens a directory dialog and returns the path of the selected directory
 func (a *api) SelectDirectory() string {
 	if wails.BuildMode == cmd.BuildModeBridge {
 		f, _ := filepath.Abs(filepath.Join(".", "internal", "server"))
@@ -706,7 +708,8 @@ func fieldViewsFromDesc(fds protoreflect.FieldDescriptors, isOneof bool, cd *cyc
 						Name:     "value",
 						FullName: "google.protobuf.Struct.value",
 						Kind:     "string",
-					}},
+					},
+					},
 				}
 				goto appendField
 			}
@@ -737,6 +740,52 @@ func (a *api) RetryConnection() {
 	}
 }
 
+// 驼峰转 snake_case
+func camelToSnake(s string) string {
+	re := regexp.MustCompile("([a-z0-9])([A-Z])")
+	return strings.ToLower(re.ReplaceAllString(s, "${1}_${2}"))
+}
+
+func normalizeMessage(m protoreflect.Message) {
+	fields := m.Descriptor().Fields()
+	for i := 0; i < fields.Len(); i++ {
+		fd := fields.Get(i)
+		val := m.Get(fd)
+
+		if fd.Kind() == protoreflect.MessageKind {
+			// 处理 FieldMask
+			if fd.Message().FullName() == "google.protobuf.FieldMask" {
+				if fm, ok := val.Message().Interface().(*fieldmaskpb.FieldMask); ok {
+					for j, path := range fm.Paths {
+						fm.Paths[j] = camelToSnake(path)
+					}
+				}
+			} else {
+				// 递归处理子 message
+				if fd.IsList() {
+					l := val.List()
+					for j := 0; j < l.Len(); j++ {
+						if sub, ok := l.Get(j).Message().Interface().(proto.Message); ok {
+							normalizeMessage(sub.ProtoReflect())
+						}
+					}
+				} else if fd.IsMap() {
+					mm := val.Map()
+					mm.Range(func(k protoreflect.MapKey, v protoreflect.Value) bool {
+						if sub, ok := v.Message().Interface().(proto.Message); ok {
+							normalizeMessage(sub.ProtoReflect())
+						}
+						return true
+					})
+				} else {
+					if sub, ok := val.Message().Interface().(proto.Message); ok {
+						normalizeMessage(sub.ProtoReflect())
+					}
+				}
+			}
+		}
+	}
+}
 func (a *api) Send(method string, rawJSON []byte, rawHeaders interface{}) (rerr error) {
 	defer func() {
 		if rerr != nil {
@@ -755,8 +804,10 @@ func (a *api) Send(method string, rawJSON []byte, rawHeaders interface{}) (rerr 
 
 	req := dynamicpb.NewMessage(md.Input())
 	if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(rawJSON, req); err != nil {
+		fmt.Printf("protojson.Unmarshal error: %v\n", err)
 		return err
 	}
+	normalizeMessage(req)
 
 	go a.setMessage(method, rawJSON)
 
