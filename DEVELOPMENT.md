@@ -80,6 +80,25 @@ the development gRPC server too.
 In debug mode you can still "Right/Option Click" -> "Inspect Element" and bring up the development tools (mac and linux
 only). This is disabled in production builds.
 
+## build
+
+```shell
+rm -rf build/
+wails build -p   
+rm -f build/Wombat
+create-dmg \
+  --volname "Wombat Installer" \
+  --volicon "appicon.png" \
+  --window-pos 200 120 \
+  --window-size 600 400 \
+  --icon-size 100 \
+  --icon "Wombat.app" 175 190 \
+  --hide-extension "Wombat.app" \
+  --app-drop-link 425 190 \
+  "build/Wombat.dmg" \
+  "build/"
+```
+
 ## Changelog
 
 We maintain a changelog for all versions of Wombat. If you create a PR please add the change to `CHANGELOG.md`. Don't

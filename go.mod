@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/go-version v1.2.1
 	github.com/jhump/protoreflect v1.8.2
 	github.com/mitchellh/mapstructure v1.4.1
-	github.com/wailsapp/wails v1.16.8
+	github.com/wailsapp/wails v1.16.9
 	google.golang.org/genproto v0.0.0-20210219173056-d891e3cb3b5b
 	google.golang.org/grpc v1.35.0
 	google.golang.org/protobuf v1.36.9

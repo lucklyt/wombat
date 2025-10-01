@@ -17,7 +17,7 @@ import (
 
 var (
 	appname = "Wombat"
-	semver  = "0.0.0-dev"
+	semver  = "0.6.0"
 )
 
 // Run is the main function to run the application
